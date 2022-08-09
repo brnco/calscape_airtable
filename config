@@ -1,5 +1,5 @@
-["Default"]
-Airtable User Email = 
-Airtable API Key = 
-Airtable Base =
-Airtable Table =
+[Default]
+email = 
+api_key = 
+base =
+table =
