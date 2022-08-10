@@ -20,6 +20,17 @@ class dotdict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
+def upload_airtable_record(our_record, airtable):
+    '''
+    uploads record to airtable
+    if record already exists, update() is used
+    '''
+    results = airtable.search("Current Botanical Name", our_record["Current Botanical Name"])
+    if results:
+        airtable.update(results[0]["id"],our_record, typecast=True)
+    else:
+        airtable.insert(our_record,typecast=True)
+
 def parse_soil_fields(airtable_record):
     '''
     separates single soil field into 'tolerates' and 'prefers'
@@ -62,7 +73,6 @@ def parse_width_feet(w_dimensions, airtable_record):
     '''
     parses width field for imperial measurements
     '''
-    print("feet or gtfo")
     w_range_ft = w_dimensions[0].split(" - ")
     airtable_record["Mature Width - min (ft)"] = float(w_range_ft[0].strip())
     if len(w_range_ft) > 1:
@@ -116,12 +126,16 @@ def parse_dimensions_fields(airtable_record):
     takes the height and width fields and makes them useful
     '''
     try:
-        og_height = airtable_record['Height']
-        h_dimensions = og_height.split("ft(")
-        if len(h_dimensions) < 2:
-            h_dimensions = og_height.split("ft (")
-        airtable_record = parse_height_feet(h_dimensions, airtable_record)
-        airtable_record = parse_height_meters(h_dimensions, airtable_record)
+        if not "nan" in airtable_record["Height"] or "NaN" in airtable_record["Height"]:
+            og_height = airtable_record['Height']
+            h_dimensions = og_height.split("ft(")
+            if len(h_dimensions) < 2:
+                h_dimensions = og_height.split("ft (")
+            airtable_record = parse_height_feet(h_dimensions, airtable_record)
+            airtable_record = parse_height_meters(h_dimensions, airtable_record)
+        else:
+            airtable_record.pop("Height",None)
+            raise RuntimeError
     except:
         print("there was an issue parsing the height info for: %s",airtable_record["Common Name"])
         print(traceback.format_exc())
@@ -130,18 +144,22 @@ def parse_dimensions_fields(airtable_record):
         airtable_record.pop("Mature Height - max (ft)",None)
         airtable_record.pop("Mature Height - max (m)",None)
     try:
-        og_width = airtable_record["Width"]
-        w_dimensions = og_width.split("ft(")
-        if len(w_dimensions) < 2:
-            w_dimensions = og_width.split("ft (")
-        if len(w_dimensions) < 2:
-            #assumes CalScape is using feet
-            airtable_record = parse_width_feet(w_dimensions, airtable_record)
-            airtable_record.pop("Mature Width - min (m)",None)
-            airtable_record.pop("Mature Width - max (m)",None)
+        if not "nan" in airtable_record["Width"] or "NaN" in airtable_record["Width"]:
+            og_width = airtable_record["Width"]
+            w_dimensions = og_width.split("ft(")
+            if len(w_dimensions) < 2:
+                w_dimensions = og_width.split("ft (")
+            if len(w_dimensions) < 2:
+                #assumes CalScape is using feet
+                airtable_record = parse_width_feet(w_dimensions, airtable_record)
+                airtable_record.pop("Mature Width - min (m)",None)
+                airtable_record.pop("Mature Width - max (m)",None)
+            else:
+                airtable_record = parse_width_feet(w_dimensions, airtable_record)
+                airtable_record = parse_width_meters(w_dimensions, airtable_record)
         else:
-            airtable_record = parse_width_feet(w_dimensions, airtable_record)
-            airtable_record = parse_width_meters(w_dimensions, airtable_record)
+            airtable_record.pop("Width",None)
+            raise RuntimeError
     except:
         print("there was an issue parsing the width info for: %s", airtable_record["Common Name"])
         print(traceback.format_exc())
@@ -149,6 +167,24 @@ def parse_dimensions_fields(airtable_record):
         airtable_record.pop("Mature Width - min (m)",None)
         airtable_record.pop("Mature Width - max (ft)",None)
         airtable_record.pop("Mature Width - max (m)",None)
+    return airtable_record
+
+def lint_record(airtable_record):
+    '''
+    handles some other cleanup
+    '''
+    #airtable_record["Flowers"] = airtable_record["Flowers"].split(",")
+    #airtable_record["Flowering Season"] = airtable_record["Flowering Season"].split(",")
+    #airtable_record["Sun"] = airtable_record["Sun"].split(",")
+    #airtable_record["Drainage"] = airtable_record["Drainage"].split(",")
+    airtable_record["Popularity Ranking"] = int(airtable_record["Popularity Ranking"])
+    #airtable_record["Plant Type"] = airtable_record["Plant Type"].split(",")
+    #airtable_record["Growth Rate"] = airtable_record["Growth Rate"].split(",")
+    #airtable_record["Water Requirement"] = airtable_record["Water Requirement"].split(",")
+    #airtable_record["Ease of Care"] = airtable_record["Ease of Care"].split(",")
+    #airtable_record["Availability in Nurseries"] = airtable_record["Availability in Nurseries"].split(",")
+    #airtable_record["Deciduous / Evergreen"] = airtable_record["Deciduous / Evergreen"].split(",")
+    #airtable_record["Common uses"] = airtable_record["Common uses"].split(",")
     return airtable_record
 
 def get_header_columns(workbook, blank_airtable_record):
@@ -176,9 +212,10 @@ def parse_workbook_to_airtable_record(workbook, airtable):
             airtable_record[index_column_map[row.index(col)]] = str(col) 
         airtable_record = parse_dimensions_fields(airtable_record)
         airtable_record = parse_soil_fields(airtable_record)
+        airtable_record = lint_record(airtable_record)
         print(airtable_record)
-        input("eh")
-    return airtable_record
+        upload_airtable_record(airtable_record,airtable)
+        #input("eh")
 
 def load_calscape_export(file_path):
     '''
@@ -270,7 +307,7 @@ def main():
         airtable = Airtable(kwargs.base, kwargs.table, kwargs.api_key)
         calscape_export = load_calscape_export(kwargs.calscape_export)
         workbook = load_calscape_export(kwargs.calscape_export)
-        something = parse_workbook_to_airtable_record(workbook, airtable)
+        parse_workbook_to_airtable_record(workbook, airtable)
     except Exception as e:
         print(traceback.format_exc())
 
