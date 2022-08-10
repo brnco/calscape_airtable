@@ -20,6 +20,48 @@ class dotdict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
+def process_dimensions_fields(airtable_record):
+    '''
+    takes the height and width fields and makes them useful
+    '''
+    try:
+        og_height = airtable_record['Height']
+        h_dimensions = og_height.split("ft(")
+        if len(h_dimensions) < 2:
+            h_dimensions = og_height.split("ft (")
+        h_range_ft = h_dimensions[0].split(" - ")
+        h_range_m = h_dimensions[1].split(" - ")
+        airtable_record["Mature Height - min (ft)"] = float(h_range_ft[0].strip())
+        airtable_record["Mature Height - min (m)"] = float(h_range_m[0].strip())
+        airtable_record["Mature Height - max (ft)"] = float(h_range_ft[1].strip())
+        airtable_record["Mature Height - max (m)"] = float(h_range_m[1].replace(" m)","").strip())
+    except:
+        print("there was an issue parsing the height info for: %s",airtable_record["Common Name"])
+        print(traceback.format_exc())
+        del airtable_record["Mature Height - min (ft)"]
+        del airtable_record["Mature Height - min (m)"]
+        del airtable_record["Mature Height - max (ft)"]
+        del airtable_record["Mature Height - max (m)"]
+    try:
+        og_width = airtable_record["Width"]
+        w_dimensions = og_width.split("ft(")
+        if len(w_dimensions) < 2:
+            w_dimensions = og_width.split("ft (")
+        w_range_ft = w_dimensions[0].split(" - ")
+        w_range_m = w_dimensions[1].split(" - ")
+        airtable_record["Mature Width - min (ft)"] = float(w_range_ft[0].strip())
+        airtable_record["Mature Width - min (m)"] = float(w_range_m[0].strip())
+        airtable_record["Mature Width - max (ft)"] = float(w_range_ft[1].strip())
+        airtable_record["Mature Width - max (m)"] = float(w_range_m[1].replace(" m)","").strip())
+    except:
+        print("there was an issue parsing the width info for: %s", airtable_record["Common Name"])
+        print(traceback.format_exc())
+        del airtable_record["Mature Width - min (ft)"]
+        del airtable_record["Mature Width - min (m)"]
+        del airtable_record["Mature Width - max (ft)"]
+        del airtable_record["Mature Width - max (m)"]
+    return airtable_record
+
 def get_header_columns(workbook, blank_airtable_record):
     '''
     gets the header column and maps indexes to airtable fields
@@ -41,11 +83,11 @@ def parse_workbook_to_airtable_record(workbook, airtable):
     lrows = workbook.values.tolist()
     for row in lrows:
         for col in row:
-            airtable_record[index_column_map[row.index(col)]] = col
+            airtable_record[index_column_map[row.index(col)]] = col 
+        airtable_record = process_dimensions_fields(airtable_record)
         print(airtable_record)
-        input("Eh")
-    return True
-
+        input("eh")
+    return airtable_record
 
 def load_calscape_export(file_path):
     '''
