@@ -20,13 +20,40 @@ class dotdict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
+def get_header_columns(workbook, blank_airtable_record):
+    '''
+    gets the header column and maps indexes to airtable fields
+    '''
+    airtable_record_column_map = blank_airtable_record.copy()
+    column_names = list(workbook.columns.values)
+    for col in column_names:
+        airtable_record_column_map[col] = column_names.index(col)
+    index_column_map = \
+            {y: x for x, y in airtable_record_column_map.items()}
+    return index_column_map
+
+def parse_workbook_to_airtable_record(workbook, airtable):
+    '''
+    takes workbook data and, per row, creates airtable records
+    '''
+    airtable_record = init_airtable_record(airtable)
+    index_column_map = get_header_columns(workbook, airtable_record)
+    lrows = workbook.values.tolist()
+    for row in lrows:
+        for col in row:
+            airtable_record[index_column_map[row.index(col)]] = col
+        print(airtable_record)
+        input("Eh")
+    return True
+
+
 def load_calscape_export(file_path):
     '''
     loads Excel file located at file_path
     '''
     with olefile.OleFileIO(file_path) as file:
         d = file.openstream('Workbook')
-        workbook = pd.read_excel(d, engine='xlrd', skiprows=4)
+        workbook = pd.read_excel(d, engine='xlrd',header=0, skiprows=4)
     return workbook
 
 def init_airtable_record(airtable):
@@ -36,10 +63,11 @@ def init_airtable_record(airtable):
     '''
     at_recs = airtable.get_all()
     at_rec = dotdict(at_recs[0])
-    at_rec.id = None
+    del at_rec.id
+    del at_rec["createdTime"]
     for field in at_rec.fields:
-        print(field)
         field = None
+    at_rec = at_rec.pop("fields")
     return at_rec
 
 def init_airtable_connection(**kwargs):
@@ -107,9 +135,9 @@ def main():
         config = init_config()
         kwargs = init_kwargs(args, config)
         airtable = Airtable(kwargs.base, kwargs.table, kwargs.api_key)
-        blank_at_rec = init_airtable_record(airtable)
         calscape_export = load_calscape_export(kwargs.calscape_export)
         workbook = load_calscape_export(kwargs.calscape_export)
+        something = parse_workbook_to_airtable_record(workbook, airtable)
     except Exception as e:
         print(traceback.format_exc())
 
