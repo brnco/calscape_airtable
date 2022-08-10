@@ -126,16 +126,12 @@ def parse_dimensions_fields(airtable_record):
     takes the height and width fields and makes them useful
     '''
     try:
-        if not "nan" in airtable_record["Height"] or "NaN" in airtable_record["Height"]:
-            og_height = airtable_record['Height']
-            h_dimensions = og_height.split("ft(")
-            if len(h_dimensions) < 2:
-                h_dimensions = og_height.split("ft (")
-            airtable_record = parse_height_feet(h_dimensions, airtable_record)
-            airtable_record = parse_height_meters(h_dimensions, airtable_record)
-        else:
-            airtable_record.pop("Height",None)
-            raise RuntimeError
+        og_height = airtable_record['Height']
+        h_dimensions = og_height.split("ft(")
+        if len(h_dimensions) < 2:
+            h_dimensions = og_height.split("ft (")
+        airtable_record = parse_height_feet(h_dimensions, airtable_record)
+        airtable_record = parse_height_meters(h_dimensions, airtable_record)
     except:
         print("there was an issue parsing the height info for: %s",airtable_record["Common Name"])
         print(traceback.format_exc())
@@ -144,22 +140,18 @@ def parse_dimensions_fields(airtable_record):
         airtable_record.pop("Mature Height - max (ft)",None)
         airtable_record.pop("Mature Height - max (m)",None)
     try:
-        if not "nan" in airtable_record["Width"] or "NaN" in airtable_record["Width"]:
-            og_width = airtable_record["Width"]
-            w_dimensions = og_width.split("ft(")
-            if len(w_dimensions) < 2:
-                w_dimensions = og_width.split("ft (")
-            if len(w_dimensions) < 2:
-                #assumes CalScape is using feet
-                airtable_record = parse_width_feet(w_dimensions, airtable_record)
-                airtable_record.pop("Mature Width - min (m)",None)
-                airtable_record.pop("Mature Width - max (m)",None)
-            else:
-                airtable_record = parse_width_feet(w_dimensions, airtable_record)
-                airtable_record = parse_width_meters(w_dimensions, airtable_record)
+        og_width = airtable_record["Width"]
+        w_dimensions = og_width.split("ft(")
+        if len(w_dimensions) < 2:
+            w_dimensions = og_width.split("ft (")
+        if len(w_dimensions) < 2:
+            #assumes CalScape is using feet
+            airtable_record = parse_width_feet(w_dimensions, airtable_record)
+            airtable_record.pop("Mature Width - min (m)",None)
+            airtable_record.pop("Mature Width - max (m)",None)
         else:
-            airtable_record.pop("Width",None)
-            raise RuntimeError
+            airtable_record = parse_width_feet(w_dimensions, airtable_record)
+            airtable_record = parse_width_meters(w_dimensions, airtable_record)
     except:
         print("there was an issue parsing the width info for: %s", airtable_record["Common Name"])
         print(traceback.format_exc())
@@ -209,7 +201,10 @@ def parse_workbook_to_airtable_record(workbook, airtable):
     for row in lrows:
         airtable_record = init_airtable_record(airtable)
         for col in row:
-            airtable_record[index_column_map[row.index(col)]] = str(col) 
+            if not str(col) == 'nan':
+                airtable_record[index_column_map[row.index(col)]] = str(col) 
+            else:
+                airtable_record.pop(index_column_map[row.index(col)],None)
         airtable_record = parse_dimensions_fields(airtable_record)
         airtable_record = parse_soil_fields(airtable_record)
         airtable_record = lint_record(airtable_record)

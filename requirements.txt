@@ -1,0 +1,5 @@
+airtable==0.4.8
+airtable_python_wrapper==0.15.3
+olefile==0.46
+pandas==1.4.3
+xlrd==2.0.1

@@ -3,9 +3,11 @@ resources for converting CalScape data for use in Airtable
 
 # Installation
 
-fork and clone per usual
+fork / clone per usual
 
 run the virtual env
+
+install from requirements.txt
 
 get an API key from Airtable
 
@@ -13,8 +15,14 @@ get an API key from Airtable
 
 generate plant list on CalScape
 
-export plant list to Excel or CSV
+export plant list to Excel
 
-`calscape_airtable.py --calscape_export /path/to/export.csv --airtable_url airtable.com/abcd/1234 --user email@example.com --api_key abcd1234`
+don't modify this Excel file
 
-The above uploads the data directly and assumes you're using the template located at [this link](https://airtable.com/shrMir3FeAZCPbgD6)
+Copy Airtable template from [this url](https://airtable.com/shrtRHFS0ksACljSv) to your own Airtable account
+
+Keep the field names and the values in the `null` record exactly the same
+
+open the `config` file in your favorite text editor and enter the base key (starts with `app`), your api key, and the name of the table that you set up (i.e. the name of the table that the above template is copied to). save the config file
+
+`calscape_airtable.py --calscape_export /path/to/export.xls`
