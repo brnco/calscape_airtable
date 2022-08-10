@@ -20,7 +20,98 @@ class dotdict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
-def process_dimensions_fields(airtable_record):
+def parse_soil_fields(airtable_record):
+    '''
+    separates single soil field into 'tolerates' and 'prefers'
+    '''
+    soil_prefers = None
+    soil_tolerates = None
+    og_soil = airtable_record["Soil"]
+    tolerates = ["tolerates", "tolerant of","accepts"]
+    regx_tolerates = []
+    for tol in tolerates:
+        regx_tolerates.append("(" + tol + r".+\Z)")
+    prog = re.compile("|".join(regx_tolerates), re.IGNORECASE)
+    result = prog.search(og_soil)
+    if result:
+        soil_tolerates = result.group()
+        tquery = result.group(1)
+    prefers = ["prefers", "does best in", "does best with"]
+    regx_prefers = []
+    for pref in prefers:
+        regx_prefers.append("(" + pref + r".+\Z)")
+    prog = re.compile("|".join(regx_prefers), re.IGNORECASE)
+    result = prog.search(og_soil)
+    if result:
+        soil_prefers = result.group()
+        pquery = result.group(1)    
+    if soil_prefers and soil_tolerates:
+        airtable_record['Soil - Tolerates'] = soil_tolerates.replace(soil_prefers,"")
+        airtable_record['Soil - Prefers'] = soil_prefers.replace(soil_tolerates,"")
+    elif soil_prefers:
+        airtable_record["Soil - Prefers"] = soil_prefers
+    elif soil_tolerates:
+        airtable_record["Soil - Tolerates"] = soil_tolerates
+    if not soil_prefers:
+        airtable_record.pop("Soil - Prefers", None)
+    if not soil_tolerates:
+        airtable_record.pop("Soil - Tolerates", None)
+    return airtable_record
+
+def parse_width_feet(w_dimensions, airtable_record):
+    '''
+    parses width field for imperial measurements
+    '''
+    print("feet or gtfo")
+    w_range_ft = w_dimensions[0].split(" - ")
+    airtable_record["Mature Width - min (ft)"] = float(w_range_ft[0].strip())
+    if len(w_range_ft) > 1:
+        airtable_record["Mature Width - max (ft)"] = float(w_range_ft[1].strip())
+    else:
+        airtable_record["Mature Width - max (ft)"] = float(w_range_ft[0].strip())
+        airtable_record.pop("Mature Width - min (ft)",None)
+    return airtable_record
+
+def parse_width_meters(w_dimensions, airtable_record):
+    '''
+    parses width field for metric measurements
+    '''
+    w_range_m = w_dimensions[1].split(" - ")
+    airtable_record["Mature Width - min (m)"] = float("".join(w_range_m[0].replace(" m)","").split()))
+    if len(w_range_m) > 1:
+        airtable_record["Mature Width - max (m)"] = float("".join(w_range_m[1].replace(" m)","").split()))
+    else:
+        airtable_record["Mature Width - max (m)"] = float("".join(w_range_m[0].replace(" m)","").split()))
+        airtable_record.pop("Mature Width - min (m)", None)
+    return airtable_record
+
+def parse_height_feet(h_dimensions, airtable_record):
+    '''
+    parses height info for imperial measurements
+    '''
+    h_range_ft = h_dimensions[0].split(" - ")
+    airtable_record["Mature Height - min (ft)"] = float(h_range_ft[0].strip())
+    if len(h_range_ft) > 1:
+        airtable_record["Mature Height - max (ft)"] = float(h_range_ft[1].strip())
+    else:
+        airtable_record["Mature Height - max (ft)"] = float(h_range_ft[0].strip())
+        airtable_record.pop("Mature Height - min (ft)", None)
+    return airtable_record
+
+def parse_height_meters(h_dimensions, airtable_record):
+    '''
+    parses height info for metric measurements
+    '''
+    h_range_m = h_dimensions[1].split(" - ")
+    airtable_record["Mature Height - min (m)"] = float(h_range_m[0].replace(" m)","").strip())
+    if len(h_range_m) > 1:
+        airtable_record["Mature Height - max (m)"] = float(h_range_m[1].replace(" m)","").strip())
+    else:
+        airtable_record["Mature Height - max (m)"] = float(h_range_m[0].replace(" m)","").strip())
+        airtable_record.pop("Mature Height - min (m)", None)
+    return airtable_record
+
+def parse_dimensions_fields(airtable_record):
     '''
     takes the height and width fields and makes them useful
     '''
@@ -29,37 +120,35 @@ def process_dimensions_fields(airtable_record):
         h_dimensions = og_height.split("ft(")
         if len(h_dimensions) < 2:
             h_dimensions = og_height.split("ft (")
-        h_range_ft = h_dimensions[0].split(" - ")
-        h_range_m = h_dimensions[1].split(" - ")
-        airtable_record["Mature Height - min (ft)"] = float(h_range_ft[0].strip())
-        airtable_record["Mature Height - min (m)"] = float(h_range_m[0].strip())
-        airtable_record["Mature Height - max (ft)"] = float(h_range_ft[1].strip())
-        airtable_record["Mature Height - max (m)"] = float(h_range_m[1].replace(" m)","").strip())
+        airtable_record = parse_height_feet(h_dimensions, airtable_record)
+        airtable_record = parse_height_meters(h_dimensions, airtable_record)
     except:
         print("there was an issue parsing the height info for: %s",airtable_record["Common Name"])
         print(traceback.format_exc())
-        del airtable_record["Mature Height - min (ft)"]
-        del airtable_record["Mature Height - min (m)"]
-        del airtable_record["Mature Height - max (ft)"]
-        del airtable_record["Mature Height - max (m)"]
+        airtable_record.pop("Mature Height - min (ft)",None)
+        airtable_record.pop("Mature Height - min (m)",None)
+        airtable_record.pop("Mature Height - max (ft)",None)
+        airtable_record.pop("Mature Height - max (m)",None)
     try:
         og_width = airtable_record["Width"]
         w_dimensions = og_width.split("ft(")
         if len(w_dimensions) < 2:
             w_dimensions = og_width.split("ft (")
-        w_range_ft = w_dimensions[0].split(" - ")
-        w_range_m = w_dimensions[1].split(" - ")
-        airtable_record["Mature Width - min (ft)"] = float(w_range_ft[0].strip())
-        airtable_record["Mature Width - min (m)"] = float(w_range_m[0].strip())
-        airtable_record["Mature Width - max (ft)"] = float(w_range_ft[1].strip())
-        airtable_record["Mature Width - max (m)"] = float(w_range_m[1].replace(" m)","").strip())
+        if len(w_dimensions) < 2:
+            #assumes CalScape is using feet
+            airtable_record = parse_width_feet(w_dimensions, airtable_record)
+            airtable_record.pop("Mature Width - min (m)",None)
+            airtable_record.pop("Mature Width - max (m)",None)
+        else:
+            airtable_record = parse_width_feet(w_dimensions, airtable_record)
+            airtable_record = parse_width_meters(w_dimensions, airtable_record)
     except:
         print("there was an issue parsing the width info for: %s", airtable_record["Common Name"])
         print(traceback.format_exc())
-        del airtable_record["Mature Width - min (ft)"]
-        del airtable_record["Mature Width - min (m)"]
-        del airtable_record["Mature Width - max (ft)"]
-        del airtable_record["Mature Width - max (m)"]
+        airtable_record.pop("Mature Width - min (ft)",None)
+        airtable_record.pop("Mature Width - min (m)",None)
+        airtable_record.pop("Mature Width - max (ft)",None)
+        airtable_record.pop("Mature Width - max (m)",None)
     return airtable_record
 
 def get_header_columns(workbook, blank_airtable_record):
@@ -82,9 +171,11 @@ def parse_workbook_to_airtable_record(workbook, airtable):
     index_column_map = get_header_columns(workbook, airtable_record)
     lrows = workbook.values.tolist()
     for row in lrows:
+        airtable_record = init_airtable_record(airtable)
         for col in row:
-            airtable_record[index_column_map[row.index(col)]] = col 
-        airtable_record = process_dimensions_fields(airtable_record)
+            airtable_record[index_column_map[row.index(col)]] = str(col) 
+        airtable_record = parse_dimensions_fields(airtable_record)
+        airtable_record = parse_soil_fields(airtable_record)
         print(airtable_record)
         input("eh")
     return airtable_record
