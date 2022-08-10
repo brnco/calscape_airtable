@@ -27,9 +27,20 @@ def load_calscape_export(file_path):
     with olefile.OleFileIO(file_path) as file:
         d = file.openstream('Workbook')
         workbook = pd.read_excel(d, engine='xlrd', skiprows=4)
-        print(workbook.head())
-    return file
+    return workbook
 
+def init_airtable_record(airtable):
+    '''
+    initializes empty Airtable record with field names from
+    https://airtable.com/shrSW1uR5Sgs670Cn
+    '''
+    at_recs = airtable.get_all()
+    at_rec = dotdict(at_recs[0])
+    at_rec.id = None
+    for field in at_rec.fields:
+        print(field)
+        field = None
+    return at_rec
 
 def init_airtable_connection(**kwargs):
     '''
@@ -96,8 +107,9 @@ def main():
         config = init_config()
         kwargs = init_kwargs(args, config)
         airtable = Airtable(kwargs.base, kwargs.table, kwargs.api_key)
-        print(kwargs)
+        blank_at_rec = init_airtable_record(airtable)
         calscape_export = load_calscape_export(kwargs.calscape_export)
+        workbook = load_calscape_export(kwargs.calscape_export)
     except Exception as e:
         print(traceback.format_exc())
 
