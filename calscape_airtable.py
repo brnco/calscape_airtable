@@ -11,6 +11,7 @@ import traceback
 import xlrd
 from airtable import Airtable
 import pandas as pd
+from pprint import pprint
 
 class dotdict(dict):
     '''
@@ -74,6 +75,8 @@ def parse_width_feet(w_dimensions, airtable_record):
     parses width field for imperial measurements
     '''
     w_range_ft = w_dimensions[0].split(" - ")
+    if len(w_range_ft) < 2:
+        w_range_ft = w_range_ft[0].split("-")
     airtable_record["Mature Width - min (ft)"] = float(w_range_ft[0].strip())
     if len(w_range_ft) > 1:
         airtable_record["Mature Width - max (ft)"] = float(w_range_ft[1].strip())
@@ -87,6 +90,8 @@ def parse_width_meters(w_dimensions, airtable_record):
     parses width field for metric measurements
     '''
     w_range_m = w_dimensions[1].split(" - ")
+    if len(w_range_m) < 2:
+        w_range_m = w_range_m[0].split("-")
     airtable_record["Mature Width - min (m)"] = float("".join(w_range_m[0].replace(" m)","").split()))
     if len(w_range_m) > 1:
         airtable_record["Mature Width - max (m)"] = float("".join(w_range_m[1].replace(" m)","").split()))
@@ -121,27 +126,74 @@ def parse_height_meters(h_dimensions, airtable_record):
         airtable_record.pop("Mature Height - min (m)", None)
     return airtable_record
 
+def parse_inches_centimeters(dimensions):
+    '''
+    converts inches / centimeters to ft/m
+    '''
+    processed_dimensions = []
+    try:
+        dimensions = dimensions[0].split(" in(")
+        if len(dimensions) < 2:
+            dimensions = dimensions[0].split(" in (")
+        if len(dimensions) < 2:
+            return dimensions
+        inches = dimensions[0].split(" - ")
+        if len(inches) < 2:
+            inches = dimensions[0].split("-")
+        if len(inches) < 2:
+            feet_max = float(inches[0].strip()) / 12.0
+            processed_dimensions.append(str(feet_max))
+        if len(inches) == 2:
+            feet_min = float(inches[0].strip()) / 12.0
+            feet_max = float(inches[1].strip()) / 12.0
+            processed_dimensions.append(str(feet_min) + " - " + str(feet_max))
+        centimeters = dimensions[1].split(" - ")
+        if len(centimeters) < 2:
+            centimeters = dimensions[1].split("-")
+        if len(centimeters) < 2:
+            meters_max = float(centimeters[0].replace(")","").replace("cm","").strip()) / 100.0
+            processed_dimensions.append(str(meters_max))
+        if len(centimeters) == 2:
+            meters_min = float(centimeters[0]) / 100.0
+            meters_max = float(centimeters[1].replace(")","").replace("cm","").strip()) / 100.0
+            processed_dimensions.append(str(meters_min) + " - " + str(meters_max))
+        return processed_dimensions
+    except:
+        print("there was an issue converting to feet/meters")
+        print(traceback.format_exc())
+        return dimensions
+
 def parse_dimensions_fields(airtable_record):
     '''
     takes the height and width fields and makes them useful
     '''
     try:
         og_height = airtable_record['Height']
+    except KeyError as e:
+        og_height = None
+    try:
         h_dimensions = og_height.split("ft(")
+        if len(h_dimensions) < 2 and ("in" in h_dimensions[0] or "cm" in h_dimensions[0]):
+            h_dimensions = parse_inches_centimeters(h_dimensions)
         if len(h_dimensions) < 2:
             h_dimensions = og_height.split("ft (")
         airtable_record = parse_height_feet(h_dimensions, airtable_record)
         airtable_record = parse_height_meters(h_dimensions, airtable_record)
     except:
-        print("there was an issue parsing the height info for: %s",airtable_record["Current Botanical Name"])
-        print(traceback.format_exc())
+        print("there was an issue parsing the height info for: ",airtable_record["Current Botanical Name"])
+        #print(traceback.format_exc())
         airtable_record.pop("Mature Height - min (ft)",None)
         airtable_record.pop("Mature Height - min (m)",None)
         airtable_record.pop("Mature Height - max (ft)",None)
         airtable_record.pop("Mature Height - max (m)",None)
     try:
         og_width = airtable_record["Width"]
+    except KeyError as e:
+        og_width = None
+    try:
         w_dimensions = og_width.split("ft(")
+        if len(w_dimensions) < 2 and ("in" in w_dimensions[0] or "cm" in w_dimensions[0]):
+            w_dimensions = parse_inches_centimeters(w_dimensions)
         if len(w_dimensions) < 2:
             w_dimensions = og_width.split("ft (")
         if len(w_dimensions) < 2:
@@ -152,9 +204,9 @@ def parse_dimensions_fields(airtable_record):
         else:
             airtable_record = parse_width_feet(w_dimensions, airtable_record)
             airtable_record = parse_width_meters(w_dimensions, airtable_record)
-    except:
-        print("there was an issue parsing the width info for: %s", airtable_record["Current Botanical Name"])
-        print(traceback.format_exc())
+    except :
+        print("there was an issue parsing the width info for: ", airtable_record["Current Botanical Name"])
+        #print(traceback.format_exc())
         airtable_record.pop("Mature Width - min (ft)",None)
         airtable_record.pop("Mature Width - min (m)",None)
         airtable_record.pop("Mature Width - max (ft)",None)
@@ -195,8 +247,8 @@ def parse_workbook_to_airtable_record(workbook, airtbl):
     '''
     takes workbook data and, per row, creates airtable records
     '''
-    airtable_record = init_airtable_record(airtbl)
-    index_column_map = get_header_columns(workbook, airtable_record)
+    blank_airtable_record = init_airtable_record(airtbl)
+    index_column_map = get_header_columns(workbook, blank_airtable_record)
     lrows = workbook.values.tolist()
     for row in lrows:
         airtable_record = init_airtable_record(airtbl)
@@ -209,6 +261,7 @@ def parse_workbook_to_airtable_record(workbook, airtbl):
         airtable_record = parse_soil_fields(airtable_record)
         airtable_record = lint_record(airtable_record)
         print("uploading info for " + airtable_record["Current Botanical Name"])
+        pprint(airtable_record)
         upload_airtable_record(airtable_record,airtbl)
 
 def load_calscape_export(file_path):
@@ -229,8 +282,8 @@ def init_airtable_record(airtbl):
     at_rec = dotdict(at_recs[0])
     del at_rec.id
     del at_rec["createdTime"]
-    for field in at_rec.fields:
-        field = None
+    for field in at_rec['fields']:
+        at_rec['fields'][field] = None
     at_rec = at_rec.pop("fields")
     return at_rec
 
@@ -294,12 +347,12 @@ def main():
     '''
     do the thing
     '''
+    print("starting...")
     try:
         args = init_args()
         config = init_config()
         kwvars = init_kwvars(args, config)
         airtbl = Airtable(kwvars.base, kwvars.table, kwvars.api_key)
-        calscape_export = load_calscape_export(kwvars.calscape_export)
         workbook = load_calscape_export(kwvars.calscape_export)
         parse_workbook_to_airtable_record(workbook, airtbl)
     except Exception as e:
