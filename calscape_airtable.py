@@ -2,16 +2,21 @@
 '''
 resources for converting CalScape data for use in Airtable
 '''
-from pathlib import Path
-import olefile
+
 import argparse
 import configparser
-import re
 import traceback
-import xlrd
+import re
+from pprint import pprint
+from pathlib import Path
+import olefile
+
+
+
+
 from airtable import Airtable
 import pandas as pd
-from pprint import pprint
+
 
 class dotdict(dict):
     '''
@@ -47,7 +52,7 @@ def parse_soil_fields(airtable_record):
     result = prog.search(og_soil)
     if result:
         soil_tolerates = result.group()
-        tquery = result.group(1)
+        #tquery = result.group(1)
     prefers = ["prefers", "does best in", "does best with"]
     regx_prefers = []
     for pref in prefers:
@@ -56,7 +61,7 @@ def parse_soil_fields(airtable_record):
     result = prog.search(og_soil)
     if result:
         soil_prefers = result.group()
-        pquery = result.group(1)
+        #pquery = result.group(1)
     if soil_prefers and soil_tolerates:
         airtable_record['Soil - Tolerates'] = soil_tolerates.replace(soil_prefers,"")
         airtable_record['Soil - Prefers'] = soil_prefers.replace(soil_tolerates,"")
@@ -92,11 +97,14 @@ def parse_width_meters(w_dimensions, airtable_record):
     w_range_m = w_dimensions[1].split(" - ")
     if len(w_range_m) < 2:
         w_range_m = w_range_m[0].split("-")
-    airtable_record["Mature Width - min (m)"] = float("".join(w_range_m[0].replace(" m)","").split()))
+    airtable_record["Mature Width - min (m)"] = \
+        float("".join(w_range_m[0].replace(" m)","").split()))
     if len(w_range_m) > 1:
-        airtable_record["Mature Width - max (m)"] = float("".join(w_range_m[1].replace(" m)","").split()))
+        airtable_record["Mature Width - max (m)"] = \
+            float("".join(w_range_m[1].replace(" m)","").split()))
     else:
-        airtable_record["Mature Width - max (m)"] = float("".join(w_range_m[0].replace(" m)","").split()))
+        airtable_record["Mature Width - max (m)"] = \
+            float("".join(w_range_m[0].replace(" m)","").split()))
         airtable_record.pop("Mature Width - min (m)", None)
     return airtable_record
 
@@ -169,7 +177,7 @@ def parse_dimensions_fields(airtable_record):
     '''
     try:
         og_height = airtable_record['Height']
-    except KeyError as e:
+    except KeyError:
         og_height = None
     try:
         h_dimensions = og_height.split("ft(")
@@ -180,7 +188,8 @@ def parse_dimensions_fields(airtable_record):
         airtable_record = parse_height_feet(h_dimensions, airtable_record)
         airtable_record = parse_height_meters(h_dimensions, airtable_record)
     except:
-        print("there was an issue parsing the height info for: ",airtable_record["Current Botanical Name"])
+        print("there was an issue parsing the height info for: ",\
+            airtable_record["Current Botanical Name"])
         #print(traceback.format_exc())
         airtable_record.pop("Mature Height - min (ft)",None)
         airtable_record.pop("Mature Height - min (m)",None)
@@ -188,7 +197,7 @@ def parse_dimensions_fields(airtable_record):
         airtable_record.pop("Mature Height - max (m)",None)
     try:
         og_width = airtable_record["Width"]
-    except KeyError as e:
+    except KeyError:
         og_width = None
     try:
         w_dimensions = og_width.split("ft(")
@@ -204,8 +213,9 @@ def parse_dimensions_fields(airtable_record):
         else:
             airtable_record = parse_width_feet(w_dimensions, airtable_record)
             airtable_record = parse_width_meters(w_dimensions, airtable_record)
-    except :
-        print("there was an issue parsing the width info for: ", airtable_record["Current Botanical Name"])
+    except:
+        print("there was an issue parsing the width info for: ", \
+            airtable_record["Current Botanical Name"])
         #print(traceback.format_exc())
         airtable_record.pop("Mature Width - min (ft)",None)
         airtable_record.pop("Mature Width - min (m)",None)
@@ -221,7 +231,8 @@ def lint_record(airtable_record):
     #airtable_record["Flowering Season"] = airtable_record["Flowering Season"].split(",")
     #airtable_record["Sun"] = airtable_record["Sun"].split(",")
     #airtable_record["Drainage"] = airtable_record["Drainage"].split(",")
-    airtable_record["Popularity Ranking"] = int(airtable_record["Popularity Ranking"])
+    airtable_record["Popularity Ranking"] = \
+        int(airtable_record["Popularity Ranking"])
     #airtable_record["Plant Type"] = airtable_record["Plant Type"].split(",")
     #airtable_record["Growth Rate"] = airtable_record["Growth Rate"].split(",")
     #airtable_record["Water Requirement"] = airtable_record["Water Requirement"].split(",")
@@ -253,7 +264,7 @@ def parse_workbook_to_airtable_record(workbook, airtbl):
     for row in lrows:
         airtable_record = init_airtable_record(airtbl)
         for col in row:
-            if not str(col) == 'nan':
+            if str(col) != 'nan':
                 airtable_record[index_column_map[row.index(col)]] = str(col)
             else:
                 airtable_record.pop(index_column_map[row.index(col)],None)
@@ -269,8 +280,8 @@ def load_calscape_export(file_path):
     loads Excel file located at file_path
     '''
     with olefile.OleFileIO(file_path) as file:
-        d = file.openstream('Workbook')
-        workbook = pd.read_excel(d, engine='xlrd',header=0, skiprows=4)
+        stream = file.openstream('Workbook')
+        workbook = pd.read_excel(stream, engine='xlrd',header=0, skiprows=4)
     return workbook
 
 def init_airtable_record(airtbl):
@@ -305,8 +316,8 @@ def init_kwvars(args, config):
         try:
             if not val:
                 kwvars[key] = config.get("Default",key)
-        except configparser.NoOptionError as e:
-           continue
+        except configparser.NoOptionError:
+            continue
     return kwvars
 
 def init_config():
@@ -318,11 +329,6 @@ def init_config():
         return False
     config = configparser.ConfigParser()
     config.read(config_path)
-    '''
-    email = config.get("Default","Airtable Email Login")
-    api_key = config.get("Default","Airtable API Key")
-    base = config.get("Default","Airtable Base")
-    table = config.get("Default","Airtable Table")'''
     return config
 
 def init_args():
@@ -355,7 +361,7 @@ def main():
         airtbl = Airtable(kwvars.base, kwvars.table, kwvars.api_key)
         workbook = load_calscape_export(kwvars.calscape_export)
         parse_workbook_to_airtable_record(workbook, airtbl)
-    except Exception as e:
+    except Exception:
         print(traceback.format_exc())
 
 if __name__ == "__main__":
