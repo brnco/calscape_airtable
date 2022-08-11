@@ -13,16 +13,36 @@ get an API key from Airtable
 
 # Use
 
-generate plant list on CalScape
+1. generate plant list on CalScape
 
-export plant list to Excel
+   export plant list to Excel
 
-don't modify this Excel file
+   don't modify this Excel file
 
-Copy Airtable template from [this url](https://airtable.com/shrtRHFS0ksACljSv) to your own Airtable account
+2. in Airtable:
 
-Keep the field names and the values in the `null` record exactly the same
+   go to [this link](https://airtable.com/shrtRHFS0ksACljSv)
 
-open the `config` file in your favorite text editor and enter the base key (starts with `app`), your api key, and the name of the table that you set up (i.e. the name of the table that the above template is copied to). save the config file
+   in the upper right-hand corner, select `Use This Data`
 
-`calscape_airtable.py --calscape_export /path/to/export.xls`
+   choose a workspace from your account, choose a base
+
+   select "Copy this data into a new table, which you can edit"
+
+   Keep the field names and the values in the `null` record exactly the same
+
+3. on your machine:
+
+   open the `config` file in your favorite text editor
+   
+   enter the base key (starts with `app` in the airtable URL)
+   
+   your api key (airtable.com -> Account -> API)
+   
+   the name of the table that you set up (default is `CalScape Edited Export Template`)
+   
+   save the config file
+
+4. run the script 
+
+   `calscape_airtable.py --calscape_export /path/to/export.xls`
