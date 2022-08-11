@@ -20,16 +20,16 @@ class dotdict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
-def upload_airtable_record(our_record, airtable):
+def upload_airtable_record(our_record, airtbl):
     '''
     uploads record to airtable
     if record already exists, update() is used
     '''
-    results = airtable.search("Current Botanical Name", our_record["Current Botanical Name"])
+    results = airtbl.search("Current Botanical Name", our_record["Current Botanical Name"])
     if results:
-        airtable.update(results[0]["id"],our_record, typecast=True)
+        airtbl.update(results[0]["id"],our_record, typecast=True)
     else:
-        airtable.insert(our_record,typecast=True)
+        airtbl.insert(our_record,typecast=True)
 
 def parse_soil_fields(airtable_record):
     '''
@@ -55,7 +55,7 @@ def parse_soil_fields(airtable_record):
     result = prog.search(og_soil)
     if result:
         soil_prefers = result.group()
-        pquery = result.group(1)    
+        pquery = result.group(1)
     if soil_prefers and soil_tolerates:
         airtable_record['Soil - Tolerates'] = soil_tolerates.replace(soil_prefers,"")
         airtable_record['Soil - Prefers'] = soil_prefers.replace(soil_tolerates,"")
@@ -133,7 +133,7 @@ def parse_dimensions_fields(airtable_record):
         airtable_record = parse_height_feet(h_dimensions, airtable_record)
         airtable_record = parse_height_meters(h_dimensions, airtable_record)
     except:
-        print("there was an issue parsing the height info for: %s",airtable_record["Common Name"])
+        print("there was an issue parsing the height info for: %s",airtable_record["Current Botanical Name"])
         print(traceback.format_exc())
         airtable_record.pop("Mature Height - min (ft)",None)
         airtable_record.pop("Mature Height - min (m)",None)
@@ -153,7 +153,7 @@ def parse_dimensions_fields(airtable_record):
             airtable_record = parse_width_feet(w_dimensions, airtable_record)
             airtable_record = parse_width_meters(w_dimensions, airtable_record)
     except:
-        print("there was an issue parsing the width info for: %s", airtable_record["Common Name"])
+        print("there was an issue parsing the width info for: %s", airtable_record["Current Botanical Name"])
         print(traceback.format_exc())
         airtable_record.pop("Mature Width - min (ft)",None)
         airtable_record.pop("Mature Width - min (m)",None)
@@ -191,26 +191,25 @@ def get_header_columns(workbook, blank_airtable_record):
             {y: x for x, y in airtable_record_column_map.items()}
     return index_column_map
 
-def parse_workbook_to_airtable_record(workbook, airtable):
+def parse_workbook_to_airtable_record(workbook, airtbl):
     '''
     takes workbook data and, per row, creates airtable records
     '''
-    airtable_record = init_airtable_record(airtable)
+    airtable_record = init_airtable_record(airtbl)
     index_column_map = get_header_columns(workbook, airtable_record)
     lrows = workbook.values.tolist()
     for row in lrows:
-        airtable_record = init_airtable_record(airtable)
+        airtable_record = init_airtable_record(airtbl)
         for col in row:
             if not str(col) == 'nan':
-                airtable_record[index_column_map[row.index(col)]] = str(col) 
+                airtable_record[index_column_map[row.index(col)]] = str(col)
             else:
                 airtable_record.pop(index_column_map[row.index(col)],None)
         airtable_record = parse_dimensions_fields(airtable_record)
         airtable_record = parse_soil_fields(airtable_record)
         airtable_record = lint_record(airtable_record)
-        print(airtable_record)
-        upload_airtable_record(airtable_record,airtable)
-        #input("eh")
+        print("uploading info for " + airtable_record["Current Botanical Name"])
+        upload_airtable_record(airtable_record,airtbl)
 
 def load_calscape_export(file_path):
     '''
@@ -221,12 +220,12 @@ def load_calscape_export(file_path):
         workbook = pd.read_excel(d, engine='xlrd',header=0, skiprows=4)
     return workbook
 
-def init_airtable_record(airtable):
+def init_airtable_record(airtbl):
     '''
     initializes empty Airtable record with field names from
     https://airtable.com/shrSW1uR5Sgs670Cn
     '''
-    at_recs = airtable.get_all()
+    at_recs = airtbl.get_all()
     at_rec = dotdict(at_recs[0])
     del at_rec.id
     del at_rec["createdTime"]
@@ -235,27 +234,27 @@ def init_airtable_record(airtable):
     at_rec = at_rec.pop("fields")
     return at_rec
 
-def init_airtable_connection(**kwargs):
+def init_airtable_connection(kwvars):
     '''
     initializes connection to airtable using data from CLI / config
     '''
-    airtable = Airtable(kwargs.base, kwargs.table, kwargs.api_key)
-    return airtable
+    airtbl = Airtable(kwvars.base, kwvars.table, kwvars.api_key)
+    return airtbl
 
-def init_kwargs(args, config):
+def init_kwvars(args, config):
     '''
-    creates an instance of kwargs, an object which will contain
+    creates an instance of kwvars, an object which will contain
     variables and such
     '''
-    kwargs = dotdict({})
+    kwvars = dotdict({})
     for key, val in vars(args).items():
-        kwargs[key] = val
+        kwvars[key] = val
         try:
             if not val:
-                kwargs[key] = config.get("Default",key)
+                kwvars[key] = config.get("Default",key)
         except configparser.NoOptionError as e:
            continue
-    return kwargs
+    return kwvars
 
 def init_config():
     '''
@@ -267,7 +266,7 @@ def init_config():
     config = configparser.ConfigParser()
     config.read(config_path)
     '''
-    email = config.get("Default","Airtable Email Login")  
+    email = config.get("Default","Airtable Email Login")
     api_key = config.get("Default","Airtable API Key")
     base = config.get("Default","Airtable Base")
     table = config.get("Default","Airtable Table")'''
@@ -298,11 +297,11 @@ def main():
     try:
         args = init_args()
         config = init_config()
-        kwargs = init_kwargs(args, config)
-        airtable = Airtable(kwargs.base, kwargs.table, kwargs.api_key)
-        calscape_export = load_calscape_export(kwargs.calscape_export)
-        workbook = load_calscape_export(kwargs.calscape_export)
-        parse_workbook_to_airtable_record(workbook, airtable)
+        kwvars = init_kwvars(args, config)
+        airtbl = Airtable(kwvars.base, kwvars.table, kwvars.api_key)
+        calscape_export = load_calscape_export(kwvars.calscape_export)
+        workbook = load_calscape_export(kwvars.calscape_export)
+        parse_workbook_to_airtable_record(workbook, airtbl)
     except Exception as e:
         print(traceback.format_exc())
 
