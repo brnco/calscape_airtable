@@ -260,8 +260,8 @@ def parse_workbook_to_airtable_record(workbook, airtbl):
         airtable_record = parse_dimensions_fields(airtable_record)
         airtable_record = parse_soil_fields(airtable_record)
         airtable_record = lint_record(airtable_record)
-        print("uploading info for " + airtable_record["Current Botanical Name"])
         pprint(airtable_record)
+        print("uploading above info for " + airtable_record["Current Botanical Name"])
         upload_airtable_record(airtable_record,airtbl)
 
 def load_calscape_export(file_path):
