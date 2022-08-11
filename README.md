@@ -3,35 +3,45 @@ resources for converting CalScape data for use in Airtable
 
 # Installation
 
-fork / clone per usual
+1. fork / clone the repo
 
-run the virtual env
+2. set up a virtual environment in the repo directory
 
-install from requirements.txt
+   `python -m venv venv`
 
-get an API key from Airtable
+3. activate virtual env
+
+   Windows: `venv\Scripts\activate.bat`
+   
+   Mac/ Linux: `source venv/bin/activate`
+   
+4. install dependencies from requirements.txt
+
+   `python -m pip install -r requirements.txt`
 
 # Use
 
 1. generate plant list on CalScape
 
-   export plant list to Excel
+2. export detailed plant list to Excel
 
-   don't modify this Excel file
+   must be "Detailed" version
 
-2. in Airtable:
+   don't modify this Excel file, script expects the raw export .xls from CalScape
+
+3. in Airtable:
 
    go to [this link](https://airtable.com/shrtRHFS0ksACljSv)
 
    in the upper right-hand corner, select `Use This Data`
 
-   choose a workspace from your account, choose a base
+   choose a workspace from your Airtable account, choose a base
 
-   select "Copy this data into a new table, which you can edit"
+   select `Copy this data into a new table, which you can edit`
 
    Keep the field names and the values in the `null` record exactly the same
 
-3. on your machine:
+4. on your machine:
 
    open the `config` file in your favorite text editor
    
@@ -43,6 +53,6 @@ get an API key from Airtable
    
    save the config file
 
-4. run the script 
+5. run the script 
 
    `calscape_airtable.py --calscape_export /path/to/export.xls`
