@@ -10,9 +10,7 @@ import re
 from pprint import pprint
 from pathlib import Path
 import olefile
-
-
-
+import time
 
 from airtable import Airtable
 import pandas as pd
@@ -41,38 +39,42 @@ def parse_soil_fields(airtable_record):
     '''
     separates single soil field into 'tolerates' and 'prefers'
     '''
-    soil_prefers = None
-    soil_tolerates = None
-    og_soil = airtable_record["Soil"]
-    tolerates = ["tolerates", "tolerant of","accepts"]
-    regx_tolerates = []
-    for tol in tolerates:
-        regx_tolerates.append("(" + tol + r".+\Z)")
-    prog = re.compile("|".join(regx_tolerates), re.IGNORECASE)
-    result = prog.search(og_soil)
-    if result:
-        soil_tolerates = result.group()
-        #tquery = result.group(1)
-    prefers = ["prefers", "does best in", "does best with"]
-    regx_prefers = []
-    for pref in prefers:
-        regx_prefers.append("(" + pref + r".+\Z)")
-    prog = re.compile("|".join(regx_prefers), re.IGNORECASE)
-    result = prog.search(og_soil)
-    if result:
-        soil_prefers = result.group()
-        #pquery = result.group(1)
-    if soil_prefers and soil_tolerates:
-        airtable_record['Soil - Tolerates'] = soil_tolerates.replace(soil_prefers,"")
-        airtable_record['Soil - Prefers'] = soil_prefers.replace(soil_tolerates,"")
-    elif soil_prefers:
-        airtable_record["Soil - Prefers"] = soil_prefers
-    elif soil_tolerates:
-        airtable_record["Soil - Tolerates"] = soil_tolerates
-    if not soil_prefers:
-        airtable_record.pop("Soil - Prefers", None)
-    if not soil_tolerates:
-        airtable_record.pop("Soil - Tolerates", None)
+    try:
+        if airtable_record["Soil"]:
+            soil_prefers = None
+            soil_tolerates = None
+            og_soil = airtable_record["Soil"]
+            tolerates = ["tolerates", "tolerant of","accepts"]
+            regx_tolerates = []
+            for tol in tolerates:
+                regx_tolerates.append("(" + tol + r".+\Z)")
+            prog = re.compile("|".join(regx_tolerates), re.IGNORECASE)
+            result = prog.search(og_soil)
+            if result:
+                soil_tolerates = result.group()
+                #tquery = result.group(1)
+            prefers = ["prefers", "does best in", "does best with"]
+            regx_prefers = []
+            for pref in prefers:
+                regx_prefers.append("(" + pref + r".+\Z)")
+            prog = re.compile("|".join(regx_prefers), re.IGNORECASE)
+            result = prog.search(og_soil)
+            if result:
+                soil_prefers = result.group()
+                #pquery = result.group(1)
+            if soil_prefers and soil_tolerates:
+                airtable_record['Soil - Tolerates'] = soil_tolerates.replace(soil_prefers,"")
+                airtable_record['Soil - Prefers'] = soil_prefers.replace(soil_tolerates,"")
+            elif soil_prefers:
+                airtable_record["Soil - Prefers"] = soil_prefers
+            elif soil_tolerates:
+                airtable_record["Soil - Tolerates"] = soil_tolerates
+            if not soil_prefers:
+                airtable_record.pop("Soil - Prefers", None)
+            if not soil_tolerates:
+                airtable_record.pop("Soil - Tolerates", None)
+    except KeyError:
+        pass
     return airtable_record
 
 def parse_width_feet(w_dimensions, airtable_record):
@@ -274,6 +276,7 @@ def parse_workbook_to_airtable_record(workbook, airtbl):
         pprint(airtable_record)
         print("uploading above info for " + airtable_record["Current Botanical Name"])
         upload_airtable_record(airtable_record,airtbl)
+        time.sleep(0.25)
 
 def load_calscape_export(file_path):
     '''
